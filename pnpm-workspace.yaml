@@ -5,6 +5,12 @@ allowBuilds:
   "@parcel/watcher": true
   esbuild: true
   unrs-resolver: true
+# Force patched versions of vulnerable transitive deps (OSV-Scanner findings,
+# 2026-10-19) where a fix exists upstream.
+overrides:
+  esbuild: 0.25.0
+  uuid: 11.1.1
+  "@babel/core": 7.29.6
 # Tracked exceptions — no patched version exists upstream for either as of
 # 2026-10-19. Both are dev-tooling-only (Expo CLI / Metro bundler), never
 # shipped to end users. See docs/SECURITY.md §Checklist > Dependencies &

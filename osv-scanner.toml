@@ -1,0 +1,17 @@
+# Tracked exceptions for `pnpm audit`'s companion CI check (OSV-Scanner).
+# All three have no patched version upstream as of 2026-10-19 and are
+# dev-tooling-only (never shipped to end users) — see docs/SECURITY.md
+# §Checklist > Dependencies & supply chain. Re-check at the start of every
+# phase; remove the entry once a fix ships.
+
+[[IgnoredVulns]]
+id = "GHSA-86w9-cpqp-85rv" # node-forge, via @expo/cli
+reason = "No patched version upstream; dev-tooling-only (Expo CLI), never shipped to end users."
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm" # braces, via metro-file-map/micromatch
+reason = "No patched version upstream; dev-tooling-only (Metro bundler), never shipped to end users."
+
+[[IgnoredVulns]]
+id = "GHSA-hp3w-g68c-fv3c" # sprintf-js, via jest's istanbul coverage chain
+reason = "No patched version upstream; dev-tooling-only (Jest coverage instrumentation), never shipped to end users."

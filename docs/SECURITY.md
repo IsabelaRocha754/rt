@@ -65,7 +65,12 @@ Each item says **how** it's done in this stack. During Phase 7, add evidence (te
 ### Dependencies & supply chain
 
 - [ ] **Scan dependencies.** Dependabot (npm + GitHub Actions), `pnpm audit --audit-level=high` and OSV-Scanner in CI (fail on high/critical), CodeQL for JS/TS. Lockfile committed; exact versions pinned; new dependencies require approval (CLAUDE.md rule 9). GitHub Actions pinned to commit SHAs. Docker image based on a slim official Node LTS image, rebuilt weekly, runs as non-root.
-  - **Tracked exceptions** (`pnpm-workspace.yaml` → `audit.ignore`, dated 2026-10-19): `GHSA-86w9-cpqp-85rv` (node-forge, via `@expo/cli`) and `GHSA-vfj7-8cjw-p6xm` (braces, via Metro's `micromatch`) — both have **no patched version** upstream as of this date, and both are dev-tooling-only (Expo CLI / Metro bundler), never shipped to end users. Re-check at the start of every phase; remove the exception and re-run `pnpm audit --audit-level=high` clean once a fix ships.
+  - **Tracked exceptions**, dated 2026-10-19 — each has **no patched version** upstream as of this date and is dev-tooling-only, never shipped to end users. Re-check at the start of every phase; remove the exception once a fix ships.
+    - `GHSA-86w9-cpqp-85rv` (node-forge, via `@expo/cli`)
+    - `GHSA-vfj7-8cjw-p6xm` (braces, via Metro's `micromatch`)
+    - `GHSA-hp3w-g68c-fv3c` (sprintf-js, via Jest's istanbul coverage chain)
+    - `pnpm audit` reads these from `pnpm-workspace.yaml` → `audit.ignore`; OSV-Scanner (a separate tool, run in CI with `--config=./osv-scanner.toml`) reads the same three IDs from `osv-scanner.toml`'s `[[IgnoredVulns]]` — both files must be kept in sync.
+  - **Fixed via `pnpm-workspace.yaml` → `overrides`**: `esbuild` (0.25.0), `uuid` (11.1.1), `@babel/core` (7.29.6) — patched versions existed upstream, so these are forced across the whole dependency tree rather than exempted.
 
 ### Logging & monitoring
 
