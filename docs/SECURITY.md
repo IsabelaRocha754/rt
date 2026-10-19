@@ -1,0 +1,127 @@
+# Security & Privacy — Plate (codename)
+
+Mandatory for every change. If a task would violate anything here, stop and ask.
+
+References: OWASP ASVS (API), OWASP MASVS (mobile), OWASP API Security Top 10.
+
+---
+
+## 1. Checklist
+
+Each item says **how** it's done in this stack. During Phase 7, add evidence (test name, CI job, config) after each item.
+
+### Secrets & keys
+
+- [ ] **Hide API keys.** All secrets (DB URLs, auth secret, OAuth secrets, Google Places key, S3 keys, email key, encryption key) live only in `.env` locally and in the host's secret manager in staging/prod. The mobile app and admin bundle contain **no secrets** — only `API_URL`, `SENTRY_DSN`, `APP_NAME`. CI greps the built mobile bundle for key patterns and fails if found. Google Places key is restricted to the Places API (New) and has a billing budget alert.
+- [ ] **Purge git secrets.** gitleaks runs as a pre-commit hook and in CI on every push and PR (full history on `main`). `.env*` is gitignored except `.env.example`. **If a secret is ever committed:** (1) rotate/revoke it immediately — assume it's compromised; (2) then remove it from history with `git filter-repo`, force-push, and ask collaborators to re-clone; (3) record it in the incident log. Purging history never replaces rotation.
+- [ ] **"Public DB key" → not applicable by design.** That pattern belongs to Supabase/Firebase, where the app talks to the DB directly. Here the app talks only to our API; there is **no database key of any kind in the client**. The DB accepts connections only from the API/worker with credentials kept server-side, over TLS.
+
+### Database
+
+- [ ] **Enable row-level security.** `ENABLE` + `FORCE ROW LEVEL SECURITY` on every table with user data. API connects as `app_user` (not owner, no `BYPASSRLS`). Each request's queries run in a transaction with `SET LOCAL app.user_id`. Policies mirror the service-layer rules in TRD §5. RLS is the **second** layer; service-layer checks are the first. A test connects as `app_user` without `app.user_id` and asserts it can read nothing private.
+- [ ] **Parameterize queries.** All DB access via Drizzle query builder or its `sql` tagged template (which parameterizes). No string concatenation into SQL, no `sql.raw` with user input (lint rule bans `sql.raw` outside migrations).
+- [ ] **Encrypt sensitive data.**
+  - In transit: TLS everywhere (client↔API, API↔DB with `sslmode=require` or stricter, API↔S3, API↔Google).
+  - At rest: managed Postgres and R2 provider encryption; backups encrypted.
+  - Field-level: OAuth provider access/refresh tokens and any future sensitive fields encrypted with AES-256-GCM (key in `FIELD_ENCRYPTION_KEY`, versioned for rotation). Use Better Auth's built-in token encryption if available; otherwise encrypt in the repo layer.
+  - Passwords are **hashed, not encrypted** (see below).
+  - IP addresses in security logs are stored hashed (HMAC) and kept ≤ 90 days.
+  - Data exports stored in a private bucket, deleted after 24 h.
+
+### Authentication & sessions
+
+- [ ] **Hash passwords.** Handled by Better Auth (memory-hard algorithm: scrypt by default; argon2id acceptable). Never implement hashing by hand, never log or return password fields. Minimum 10 characters; reject passwords found in breach lists.
+- [ ] **Enforce server-side auth.** Every route is authenticated by default (Fastify `onRequest` hook); public routes must be explicitly listed (`/health`, auth routes, `GET /lists/share/:slug`). Client-side checks (hidden buttons) are UX only and never trusted. Email verification required before any write that's visible to others.
+- [ ] **Secure session cookies (admin web) / secure token storage (mobile).**
+  - Admin panel: cookies `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`, short idle timeout (30 min), absolute timeout (12 h), CSRF protection on state-changing requests, TOTP 2FA required for admin accounts.
+  - Mobile: native apps don't use browser cookies; session tokens are stored in **expo-secure-store** (Keychain / Keystore) via Better Auth's Expo integration — never in AsyncStorage, logs, or URLs.
+  - Sessions are revocable; password change/reset revokes all other sessions; "sign out of all devices" exists.
+- [ ] **Rate-limit login.** `@fastify/rate-limit` on auth routes: per IP and per account identifier (e.g. 5 attempts/min, then progressive backoff and temporary lock after 20/hour). Same for signup, password reset, and verification-email resend. Generic error messages to avoid account enumeration. Use a shared store (Redis/Upstash or Postgres) once more than one API instance runs.
+- [ ] **Add bot protection.**
+  - Rate limits on signup, login, follow, like, comment, report, restaurant submission, autocomplete.
+  - Email verification before posting; new accounts (< 24 h) get lower limits.
+  - Disposable-email domain blocklist at signup.
+  - Device attestation before launch: Apple App Attest / Google Play Integrity token checked on signup and login (Phase 7). Cloudflare Turnstile on the admin login page.
+  - Anomaly alerts: spikes in signups or 429s from one source.
+
+### Authorization
+
+- [ ] **Lock record access (no IDOR).** Every read/write loads the record **with** an ownership/visibility condition (`WHERE id = $1 AND user_id = $session`) or calls `canView`. UUIDv7 IDs (not guessable sequences — but never relied upon as security). Tests: for every endpoint, another user gets 404 (not 403, to avoid confirming existence) for private resources.
+- [ ] **Block field tampering (mass assignment).** Request schemas are Zod `.strict()` objects listing only client-editable fields; unknown keys → 400. Server sets `user_id`, `author_id`, `owner_id`, `role`, `plan`, `status`, `created_by`, `approved_*`, timestamps. Enum and numeric ranges validated (rating 1–10, price ≥ 0). Tests send forbidden fields and assert rejection.
+- [ ] **Admin authorization** checked on every `/v1/admin/*` request (role from DB, not token claim cache older than the session).
+
+### Input & output
+
+- [ ] **Validate all input.** Zod schemas for params, query, body, and headers we read; limits from `packages/shared` (lengths, counts, ranges). Strings trimmed, Unicode-normalized (NFC), control characters stripped; usernames restricted to `[a-z0-9_.]`. Body size limit (100 KB JSON). Validation happens on the server even if the client also validates.
+- [ ] **Escape user content.** User text is stored raw and rendered only as plain text: React Native `<Text>` (no HTML rendering), React in admin with default escaping, **no** `dangerouslySetInnerHTML`, no Markdown/HTML rendering, no WebViews showing user content. The list share page (if rendered server-side) uses an auto-escaping template. Links in reviews are not auto-linked in v1.
+- [ ] **Restrict file uploads.** Only via presigned PUT to a quarantine bucket; allowlist JPEG/PNG/WebP/HEIC; 5 MB max enforced in the presigned policy and again on processing; magic-byte check; decode + re-encode with sharp; strip all metadata (EXIF/GPS); max dimensions; random object keys; quarantine objects never served; max 4 photos per log; orphan cleanup. Uploads are reportable and removable by admins.
+- [ ] **Trim API responses.** Every route has a Zod **response** schema; Fastify serializes only declared fields. Never return: email (except to its owner), password/hash, tokens, `role`/`plan`/`status` of others, internal flags, quarantine keys, IP data, Google raw payloads beyond the field mask. Errors return `{ error: { code, message } }` without stack traces or SQL.
+
+### Transport & headers
+
+- [ ] **Add security headers.** `@fastify/helmet` on the API and admin: `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY` / `frame-ancestors 'none'`, strict `Content-Security-Policy` on admin and share pages, `Cross-Origin-Resource-Policy`. CORS: allowlist only the admin origin (mobile doesn't need CORS); never `*` with credentials.
+- [ ] **Force HTTPS.** Platform TLS termination with HTTP→HTTPS redirect and HSTS; API refuses to start in production with non-`https` URLs in config; mobile uses HTTPS only (iOS ATS defaults on, Android `usesCleartextTraffic=false` in release builds). Presigned URLs are HTTPS.
+
+### Dependencies & supply chain
+
+- [ ] **Scan dependencies.** Dependabot (npm + GitHub Actions), `pnpm audit --audit-level=high` and OSV-Scanner in CI (fail on high/critical), CodeQL for JS/TS. Lockfile committed; exact versions pinned; new dependencies require approval (CLAUDE.md rule 9). GitHub Actions pinned to commit SHAs. Docker image based on a slim official Node LTS image, rebuilt weekly, runs as non-root.
+  - **Tracked exceptions** (`pnpm-workspace.yaml` → `audit.ignore`, dated 2026-10-19): `GHSA-86w9-cpqp-85rv` (node-forge, via `@expo/cli`) and `GHSA-vfj7-8cjw-p6xm` (braces, via Metro's `micromatch`) — both have **no patched version** upstream as of this date, and both are dev-tooling-only (Expo CLI / Metro bundler), never shipped to end users. Re-check at the start of every phase; remove the exception and re-run `pnpm audit --audit-level=high` clean once a fix ships.
+
+### Logging & monitoring
+
+- [ ] Structured logs with redaction (`authorization`, `cookie`, `password`, `token`, `email`, presigned URLs).
+- [ ] Sentry with `sendDefaultPii: false` and a `beforeSend` scrubber; no request bodies attached.
+- [ ] `audit_log` for admin actions, role changes, account deletion, password changes.
+- [ ] Alerts: error-rate spike, auth 429 spike, Google budget threshold, failed jobs.
+
+### Backups & recovery
+
+- [ ] Managed automated backups with point-in-time recovery where available; one restore drill before launch; documented in `docs/runbooks/restore.md`.
+
+---
+
+## 2. Privacy (LGPD)
+
+- **Data minimization:** collect only what features need. No birthdate stored — only the 18+ confirmation timestamp. No contacts upload. Location used only to bias a search request and **never stored or logged**.
+- **Legal bases:** contract execution (account, core features); legitimate interest (security logs, abuse prevention); consent where required. Documented in the Privacy Policy.
+- **User rights:** in-app data export; in-app account deletion (content hidden immediately, hard-deleted within 30 days, backups expire on their normal rotation); profile editing; privacy controls.
+- **Companion tags** require consent of the tagged person (approval) and are removable by them.
+- **Photos:** metadata stripped so location isn't leaked.
+- **International transfer:** hosting may be outside Brazil (US region initially); the Privacy Policy must disclose this and the safeguards used.
+- **Processors:** list hosting, DB, storage, email, Sentry, Google in the Privacy Policy.
+- **Encarregado (DPO) contact:** an email address published in the Privacy Policy.
+- **Incident response:** documented steps (contain, rotate secrets, assess, notify ANPD and affected users when required).
+
+## 3. Legal & age
+
+- **Minimum age 18.** Brazil's ECA Digital (Lei 15.211/2025, in force since 17 March 2026) applies to services likely to be accessed by under-18s and forbids self-declaration as the age-check mechanism. Policy for v1:
+  - Store age rating set to 18+ on both stores.
+  - Signup requires 18+ confirmation and, where the platform exposes an age signal API, the app reads it and blocks under-18 accounts.
+  - Terms of Service state the 18+ requirement; reports of underage users lead to account suspension.
+- **Get a legal review** of the age policy, Terms of Service and Privacy Policy before launch. These docs are engineering requirements, not legal advice.
+- **Google Maps Platform terms:** caching limits, attribution requirements, field masks — verify before Phase 2 and re-check yearly.
+- **Store policies:** Sign in with Apple (required when offering Google sign-in on iOS), in-app account deletion, UGC moderation (report, block, removal, published contact).
+
+## 4. Threat model (summary)
+
+| Threat                                 | Main controls                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------------- |
+| Account takeover (credential stuffing) | Rate limits, breached-password check, generic errors, attestation, session revocation |
+| Reading private profiles/logs (IDOR)   | Service-layer checks + RLS + visibility test matrix                                   |
+| Privilege escalation via request body  | Strict schemas, server-set fields, tests                                              |
+| Stalking via photos/location           | EXIF stripping, no stored location, tag approval, block                               |
+| Harassment/spam in comments            | Rate limits, verification, report/block/mute, admin removal                           |
+| Malicious file upload                  | Quarantine, magic bytes, re-encode, size/type limits                                  |
+| Leaked secrets                         | gitleaks, no client secrets, rotation procedure, restricted keys                      |
+| Google bill spike / key abuse          | Server-only key, restrictions, per-user limits, cache, budget alerts                  |
+| Vulnerable dependency                  | Dependabot, audit/OSV, CodeQL, pinned versions                                        |
+| Data loss                              | Automated backups, restore drill                                                      |
+
+## 5. Rules for the coding agent
+
+1. Never print, log, or echo secrets — including in test output and error messages.
+2. Never disable a check (TLS verification, RLS, rate limit, CSRF, validation) to make something work. Ask instead.
+3. Every new endpoint ships with: auth, request schema (`.strict()`), response schema, authorization check, and a cross-user access test.
+4. Every new table with user data ships with RLS policies in the same migration.
+5. Any new user-generated field gets a length limit in `packages/shared` and is rendered as plain text.
+6. Security-relevant changes use the `sec:` commit prefix and update this document.

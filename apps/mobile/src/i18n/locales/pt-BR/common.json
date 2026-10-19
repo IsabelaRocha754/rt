@@ -1,0 +1,13 @@
+{
+  "tabs": {
+    "feed": "Início",
+    "search": "Buscar",
+    "activity": "Atividade",
+    "profile": "Perfil"
+  },
+  "feed": { "placeholder": "Seu feed vai aparecer aqui." },
+  "search": { "placeholder": "Busque restaurantes e pessoas." },
+  "activity": { "placeholder": "Notificações e solicitações vão aparecer aqui." },
+  "profile": { "placeholder": "Seu diário, listas e estatísticas vão aparecer aqui." },
+  "logSheet": { "placeholder": "Registrar uma visita." }
+}

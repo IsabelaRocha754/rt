@@ -1,0 +1,9 @@
+title = "plate gitleaks config"
+
+[extend]
+useDefault = true
+
+# .env.example intentionally holds obviously-fake placeholder values
+# ("changeme", "replace-with-...", "minioadmin"); nothing else is excluded.
+[allowlist]
+paths = ['''\.env\.example''']

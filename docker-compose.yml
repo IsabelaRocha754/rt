@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app_owner
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: plate
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-roles.sql:/docker-entrypoint-initdb.d/init-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_owner -d plate"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # S3-compatible storage for local dev. Both MinIO's images (quay.io/minio/*)
+  # and LocalStack's now require a registry login / auth token to even boot —
+  # see docs/TRD.md §2a. zenko/cloudserver is a plain, unauthenticated,
+  # single-container S3-compatible server with no account/token of any kind.
+  s3:
+    image: zenko/cloudserver:latest
+    environment:
+      SCALITY_ACCESS_KEY_ID: test
+      SCALITY_SECRET_ACCESS_KEY: test
+      REMOTE_MANAGEMENT_DISABLE: "1"
+      # Registers the "s3" Docker Compose service name (and the API's own
+      # localhost address) as valid Host headers — without this, requests
+      # from other containers fail with "Could not parse the specified URI."
+      ENDPOINT: "s3,localhost"
+    ports:
+      - "4566:8000"
+    volumes:
+      - s3data:/usr/src/app/localData
+      - s3metadata:/usr/src/app/localMetadata
+    healthcheck:
+      # wget exits 8 on an HTTP-level error (e.g. 403 for an unsigned request) —
+      # that still means the server answered. Only a network-level failure
+      # (no server yet) should fail the healthcheck.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8000/; test $? -ne 4"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  s3-init:
+    image: amazon/aws-cli:2.33.3
+    depends_on:
+      s3:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        aws configure set s3.addressing_style path &&
+        for b in plate-quarantine plate-public plate-private; do
+          aws --endpoint-url http://s3:8000 s3 mb s3://$$b || true;
+        done &&
+        aws --endpoint-url http://s3:8000 s3api put-bucket-policy --bucket plate-public --policy '{
+          "Version": "2012-10-17",
+          "Statement": [{"Effect": "Allow", "Principal": "*", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::plate-public/*"}]
+        }'
+
+volumes:
+  pgdata:
+  s3data:
+  s3metadata:

@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app_owner
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: plate
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app_owner -d plate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://app_user:changeme@localhost:5432/plate
+      DATABASE_URL_OWNER: postgres://app_owner:changeme@localhost:5432/plate
+      ADMIN_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Create app_user / app_worker roles (mirrors docker/postgres/init-roles.sql)
+        run: |
+          PGPASSWORD=changeme psql -h localhost -U app_owner -d plate -c "CREATE ROLE app_user LOGIN PASSWORD 'changeme';"
+          PGPASSWORD=changeme psql -h localhost -U app_owner -d plate -c "CREATE ROLE app_worker LOGIN PASSWORD 'changeme';"
+
+      - name: Migrate
+        run: pnpm db:migrate
+
+      - name: Test
+        run: pnpm test
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency audit (pnpm)
+        run: pnpm audit --audit-level=high
+
+      - name: Dependency audit (OSV-Scanner)
+        uses: google/osv-scanner-action/osv-scanner-action@6ad84ce1ef2d4124ba333b221894c133c4a970ea # v2.7.0
+        with:
+          scan-args: |-
+            --recursive
+            ./
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@d208ec71e39ae46397cbf6569bef8439b9aab974 # codeql-bundle-v2.27.2
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@d208ec71e39ae46397cbf6569bef8439b9aab974 # codeql-bundle-v2.27.2

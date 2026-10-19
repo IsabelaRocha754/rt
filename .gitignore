@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.expo/
+.expo-shared/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store

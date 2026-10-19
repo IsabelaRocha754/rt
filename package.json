@@ -1,0 +1,40 @@
+{
+  "name": "plate",
+  "private": true,
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "test:security": "pnpm --filter @plate/api run test:security",
+    "dev:api": "pnpm --filter @plate/api run dev",
+    "dev:mobile": "pnpm --filter @plate/mobile run dev",
+    "dev:admin": "pnpm --filter @plate/admin run dev",
+    "db:migrate": "pnpm --filter @plate/api run db:migrate",
+    "db:seed": "pnpm --filter @plate/api run db:seed",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.14.1",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}
