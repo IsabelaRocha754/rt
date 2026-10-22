@@ -7,6 +7,8 @@ import type { AppUserDb } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import type { Env } from "../env.js";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../email.js";
+import { withUserTx } from "../db/rls.js";
+import { profiles } from "../db/schema/profiles.js";
 import { buildAppleClientSecret } from "./apple-client-secret.js";
 
 // Separate from the generic error-handler plugin's `{ error: { code,
@@ -117,6 +119,22 @@ export async function buildAuth(env: Env, db: AppUserDb) {
           "This password has appeared in a data breach. Please choose a different one.",
       }),
     ],
+    databaseHooks: {
+      user: {
+        create: {
+          // Every signup method (email+password, Google, Apple) ends up
+          // here — this is the one place a `profiles` row gets created.
+          // `withUserTx` sets `app.user_id` to the new user's own id for
+          // the duration of the insert, satisfying the `profiles_insert`
+          // RLS policy (the new user has no session yet to carry it).
+          after: async (newUser) => {
+            await withUserTx(db, newUser.id, async (tx) => {
+              await tx.insert(profiles).values({ userId: newUser.id });
+            });
+          },
+        },
+      },
+    },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === "/sign-up/email") {

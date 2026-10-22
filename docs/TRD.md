@@ -215,6 +215,8 @@ Implemented in the service layer **and** mirrored in RLS policies (defense in de
 
 Applies to: profile details beyond username/avatar, logs, lists, want-to-go, stats, follower/following lists.
 
+**Phase 1 note (profiles, PR3):** rule 5's "follows" branch can't exist yet — `follows` lands in Phase 4. Until then, `canView` for a private profile is `viewer == owner` only; every other non-owner gets the public teaser (username, display name, avatar, `isPrivate: true`) per USER_FLOWS.md F13, never 404. RLS's job here is narrower than `canView` itself: it hides a row entirely only for "doesn't exist" or "suspended, not self" (both → 404); whether a _visible_ row renders as the full profile or the private teaser is a service-layer decision (`src/modules/profiles/service.ts`), not an RLS one — a private account's row is still RLS-readable by any non-blocked viewer, just rendered differently.
+
 Additional rules:
 
 - **Unauthenticated access:** only list share links (`/v1/lists/share/:slug`) for public owners. Everything else requires a session.

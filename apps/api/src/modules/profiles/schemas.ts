@@ -1,0 +1,69 @@
+import { z } from "zod";
+import {
+  BIO_MAX_LENGTH,
+  DISPLAY_NAME_MAX_LENGTH,
+  isValidUsername,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+} from "@plate/shared";
+
+const usernameSchema = z
+  .string()
+  .min(USERNAME_MIN_LENGTH)
+  .max(USERNAME_MAX_LENGTH)
+  .transform((value) => value.toLowerCase())
+  .refine(isValidUsername, {
+    message: "Usernames use only a-z, 0-9, '_' and '.', and can't be a reserved name.",
+  });
+
+// Only these fields are ever writable from the request body — role/plan/
+// status/user_id/timestamps are server-set (CLAUDE.md rule 4). `.strict()`
+// makes an unknown key (e.g. `role`) a 400, not a silently-ignored no-op.
+export const patchMeBodySchema = z
+  .object({
+    username: usernameSchema.optional(),
+    displayName: z.string().trim().max(DISPLAY_NAME_MAX_LENGTH).nullable().optional(),
+    bio: z.string().trim().max(BIO_MAX_LENGTH).nullable().optional(),
+    isPrivate: z.boolean().optional(),
+    locale: z.enum(["pt-BR", "en"]).optional(),
+  })
+  .strict();
+
+export type PatchMeBody = z.infer<typeof patchMeBodySchema>;
+
+export const errorResponseSchema = z.object({
+  error: z.object({ code: z.string(), message: z.string() }),
+});
+
+// Whitelists exactly what a route may return (SECURITY.md "Trim API
+// responses") — never email/tokens/role/plan/status of someone ELSE, and
+// never the raw internal flags.
+export const meResponseSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  emailVerified: z.boolean(),
+  username: z.string().nullable(),
+  displayName: z.string().nullable(),
+  bio: z.string().nullable(),
+  avatarKey: z.string().nullable(),
+  isPrivate: z.boolean(),
+  locale: z.string(),
+  role: z.enum(["user", "admin"]),
+  plan: z.enum(["free", "premium"]),
+  status: z.enum(["active", "suspended"]),
+  createdAt: z.coerce.string(),
+  updatedAt: z.coerce.string(),
+});
+
+export const usernameParamSchema = z.object({ username: z.string() });
+
+// A private, non-self profile only ever gets this much (USER_FLOWS.md
+// F13): avatar, username, display name, and the "this account is private"
+// signal — never bio, role, plan, status, or timestamps.
+export const publicProfileResponseSchema = z.object({
+  username: z.string().nullable(),
+  displayName: z.string().nullable(),
+  avatarKey: z.string().nullable(),
+  isPrivate: z.boolean(),
+  bio: z.string().nullable().optional(),
+});

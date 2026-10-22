@@ -3,6 +3,10 @@ import type { FastifyInstance, InjectOptions } from "fastify";
 import { createOwnerDb } from "../../src/db/client.js";
 import type { Env } from "../../src/env.js";
 
+// Shared with test/helpers/auth.ts, which needs the same secret to mint a
+// verification token directly instead of going through a mocked email send.
+export const TEST_BETTER_AUTH_SECRET = "test-secret-at-least-32-characters-long";
+
 export function buildTestEnv(overrides: Partial<Env> = {}): Env {
   return {
     NODE_ENV: "test",
@@ -12,7 +16,7 @@ export function buildTestEnv(overrides: Partial<Env> = {}): Env {
     DATABASE_URL_OWNER:
       process.env.DATABASE_URL_OWNER ?? "postgres://app_owner:changeme@localhost:5432/plate",
     ADMIN_ORIGIN: "http://localhost:5173",
-    BETTER_AUTH_SECRET: "test-secret-at-least-32-characters-long",
+    BETTER_AUTH_SECRET: TEST_BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: "http://localhost:3000",
     EMAIL_API_KEY: "",
     EMAIL_FROM: "Plate <no-reply@plate.app>",
@@ -36,6 +40,15 @@ export function uniqueEmail(label: string): string {
 // shared default "127.0.0.1" inject address within the same 60s window.
 export function injectAs(app: FastifyInstance, remoteAddress: string) {
   return (options: InjectOptions) => app.inject({ ...options, remoteAddress });
+}
+
+// A fresh, effectively-unique IP per call. test/helpers/auth.ts uses this
+// so every signed-up test user gets its own Better Auth rate-limit bucket
+// — a shared fixed IP across many signups/sign-ins in one test file (or
+// loop) hits the 5/min cap long before the test does anything interesting.
+export function uniqueRemoteAddress(): string {
+  const octet = () => Math.floor(Math.random() * 254) + 1;
+  return `10.${octet()}.${octet()}.${octet()}`;
 }
 
 // Better Auth's rate limit key is `${ip}|${path}` (persisted, storage:

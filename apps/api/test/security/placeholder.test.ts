@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
+import { signInCookie, signUpAndVerify } from "../helpers/auth.js";
 import { buildTestEnv, clearRateLimit, injectAs, uniqueEmail } from "../helpers/env.js";
 
-// DEV_PLAN Phase 1 "Security tests" bullet. Full IDOR/visibility matrix
-// testing arrives with the first user-owned resources (profiles, Phase 1
-// PR3; logs, lists, ... later) — see docs/SECURITY.md §Authorization. These
-// two are testable now, against the auth routes landing in this PR.
+// DEV_PLAN Phase 1 "Security tests" bullet, plus its own acceptance
+// criterion ("PATCH /me with { role: admin } → 400 and role unchanged").
+// Full IDOR/visibility matrix testing arrives with logs/lists/follows —
+// see docs/SECURITY.md §Authorization and test/profiles/*.test.ts for the
+// profiles-specific canView coverage that landed with PR3.
 describe("security test suite", () => {
   const env = buildTestEnv();
   const app = buildApp(env);
@@ -54,5 +56,23 @@ describe("security test suite", () => {
     expect(signIn.json().code).toBe("EMAIL_NOT_VERIFIED");
   });
 
-  it.todo("IDOR visibility matrix — arrives with profiles/logs/lists (TRD §5)");
+  it("PATCH /me with { role: admin } → 400 and role unchanged (DEV_PLAN acceptance)", async () => {
+    const email = uniqueEmail("security-patch-me-role");
+    const password = "whatever-password-1";
+    await signUpAndVerify(app, { email, password });
+    const cookie = await signInCookie(app, { email, password });
+
+    const patch = await inject({
+      method: "PATCH",
+      url: "/v1/me",
+      headers: { cookie },
+      payload: { role: "admin" },
+    });
+    expect(patch.statusCode).toBe(400);
+
+    const me = await inject({ method: "GET", url: "/v1/me", headers: { cookie } });
+    expect(me.json().role).toBe("user");
+  });
+
+  it.todo("IDOR visibility matrix — arrives with logs/lists/follows (TRD §5)");
 });

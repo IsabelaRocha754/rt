@@ -2,12 +2,17 @@ import fp from "fastify-plugin";
 import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { buildAuth, type Auth } from "../auth/auth.js";
-import { createAppUserDb } from "../db/client.js";
 import type { Env } from "../env.js";
+
+type Session = NonNullable<Awaited<ReturnType<Auth["api"]["getSession"]>>>;
 
 declare module "fastify" {
   interface FastifyInstance {
     auth: Auth;
+    requireSession: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+  interface FastifyRequest {
+    session: Session | null;
   }
 }
 
@@ -66,11 +71,20 @@ async function forwardToAuth(
 }
 
 export default fp(async function authPlugin(app: FastifyInstance, opts: { env: Env }) {
-  const db = createAppUserDb(opts.env.DATABASE_URL);
-  const auth = await buildAuth(opts.env, db);
+  const auth = await buildAuth(opts.env, app.db);
   app.decorate("auth", auth);
-  app.addHook("onClose", async () => {
-    await db.$client.end();
+  app.decorateRequest("session", null);
+
+  // Every route is authenticated by default (SECURITY.md "Enforce
+  // server-side auth") — feature modules opt a route INTO this, there's no
+  // opt-out: public routes live only in modules that never register it.
+  app.decorate("requireSession", async (request: FastifyRequest, reply: FastifyReply) => {
+    const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
+    if (!session) {
+      reply.status(401).send({ error: { code: "unauthorized", message: "Sign in required." } });
+      return;
+    }
+    request.session = session;
   });
 
   const handler = (request: FastifyRequest, reply: FastifyReply) =>
