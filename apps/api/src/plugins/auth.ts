@@ -20,6 +20,7 @@ declare module "fastify" {
 const SENSITIVE_PATHS = [
   "/sign-in/email",
   "/sign-up/email",
+  "/sign-in/social",
   "/request-password-reset",
   "/send-verification-email",
 ];
@@ -66,7 +67,7 @@ async function forwardToAuth(
 
 export default fp(async function authPlugin(app: FastifyInstance, opts: { env: Env }) {
   const db = createAppUserDb(opts.env.DATABASE_URL);
-  const auth = buildAuth(opts.env, db);
+  const auth = await buildAuth(opts.env, db);
   app.decorate("auth", auth);
   app.addHook("onClose", async () => {
     await db.$client.end();

@@ -101,6 +101,8 @@ All tables: `id uuid` (UUIDv7) primary key unless noted, `created_at timestamptz
 
 Auth tables (`user`, `session`, `account`, `verification`) are managed by Better Auth. App profile data lives in `profiles`, 1:1 with the auth user.
 
+Google and Apple sign-in (`src/auth/auth.ts`) are each wired in only once their own env vars are fully set (`env.ts` rejects a partial set for either) — the API boots and email+password works with neither configured. Apple's "client secret" is actually a short-lived ES256 JWT that Better Auth expects pre-built (it does not generate one from a team id/key id/private key itself), so `src/auth/apple-client-secret.ts` signs it ourselves at startup from `APPLE_TEAM_ID`/`APPLE_KEY_ID`/`APPLE_PRIVATE_KEY`.
+
 ### profiles
 
 | column                           | type                                        | notes                                   |

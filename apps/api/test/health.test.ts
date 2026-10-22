@@ -13,6 +13,12 @@ const testEnv: Env = {
   BETTER_AUTH_URL: "http://localhost:3000",
   EMAIL_API_KEY: "",
   EMAIL_FROM: "Plate <no-reply@plate.app>",
+  GOOGLE_OAUTH_CLIENT_ID: "",
+  GOOGLE_OAUTH_CLIENT_SECRET: "",
+  APPLE_CLIENT_ID: "",
+  APPLE_TEAM_ID: "",
+  APPLE_KEY_ID: "",
+  APPLE_PRIVATE_KEY: "",
 };
 
 describe("GET /health", () => {

@@ -7,6 +7,7 @@ import type { AppUserDb } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import type { Env } from "../env.js";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../email.js";
+import { buildAppleClientSecret } from "./apple-client-secret.js";
 
 // Separate from the generic error-handler plugin's `{ error: { code,
 // message } }` envelope: these requests never reach our Fastify route
@@ -16,8 +17,45 @@ function rejectSignUp(code: string, message: string): never {
   throw new APIError("BAD_REQUEST", { code, message });
 }
 
-export function buildAuth(env: Env, db: AppUserDb) {
+// Google/Apple only get added once their own vars are filled in (env.ts
+// enforces each provider's vars are all-or-nothing) — this is what "stub/
+// skip OAuth until credentials exist" means in practice: the API boots and
+// email+password works regardless, and each provider turns on by itself
+// the moment its .env values are real.
+async function buildSocialProviders(env: Env) {
+  const providers: NonNullable<Parameters<typeof betterAuth>[0]["socialProviders"]> = {};
+
+  if (env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET) {
+    providers.google = {
+      clientId: env.GOOGLE_OAUTH_CLIENT_ID,
+      clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+    };
+  }
+
+  if (env.APPLE_CLIENT_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY) {
+    providers.apple = {
+      clientId: env.APPLE_CLIENT_ID,
+      clientSecret: await buildAppleClientSecret({
+        teamId: env.APPLE_TEAM_ID,
+        keyId: env.APPLE_KEY_ID,
+        privateKey: env.APPLE_PRIVATE_KEY,
+        clientId: env.APPLE_CLIENT_ID,
+      }),
+      // TODO(PR4, mobile Expo integration): add `appBundleIdentifier` once
+      // the mobile app's bundle id is wired through — needed for native
+      // (id-token) Sign in with Apple, not for this web/authorization-code
+      // flow.
+    };
+  }
+
+  return providers;
+}
+
+export async function buildAuth(env: Env, db: AppUserDb) {
+  const socialProviders = await buildSocialProviders(env);
+
   return betterAuth({
+    socialProviders,
     secret: env.BETTER_AUTH_SECRET,
     // Must include the mount path — TRD §7 mounts Better Auth at
     // `/v1/auth/*` (src/plugins/auth.ts), not the library default
@@ -38,6 +76,11 @@ export function buildAuth(env: Env, db: AppUserDb) {
       ipAddress: { ipAddressHeaders: ["x-real-ip"] },
     },
     database: drizzleAdapter(db, { provider: "pg", schema }),
+    // SECURITY.md "Encrypt sensitive data" > field-level: OAuth access/
+    // refresh tokens stored in the `account` table are encrypted at rest,
+    // using Better Auth's own built-in symmetric encryption (keyed from
+    // `secret` above) rather than us reimplementing it.
+    account: { encryptOAuthTokens: true },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,
@@ -63,6 +106,7 @@ export function buildAuth(env: Env, db: AppUserDb) {
       customRules: {
         "/sign-in/email": { window: 60, max: 5 },
         "/sign-up/email": { window: 60, max: 5 },
+        "/sign-in/social": { window: 60, max: 5 },
         "/request-password-reset": { window: 60, max: 5 },
         "/send-verification-email": { window: 60, max: 5 },
       },
@@ -94,4 +138,4 @@ export function buildAuth(env: Env, db: AppUserDb) {
   });
 }
 
-export type Auth = ReturnType<typeof buildAuth>;
+export type Auth = Awaited<ReturnType<typeof buildAuth>>;

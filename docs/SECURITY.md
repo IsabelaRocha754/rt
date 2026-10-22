@@ -23,7 +23,7 @@ Each item says **how** it's done in this stack. During Phase 7, add evidence (te
 - [ ] **Encrypt sensitive data.**
   - In transit: TLS everywhere (client↔API, API↔DB with `sslmode=require` or stricter, API↔S3, API↔Google).
   - At rest: managed Postgres and R2 provider encryption; backups encrypted.
-  - Field-level: OAuth provider access/refresh tokens and any future sensitive fields encrypted with AES-256-GCM (key in `FIELD_ENCRYPTION_KEY`, versioned for rotation). Use Better Auth's built-in token encryption if available; otherwise encrypt in the repo layer.
+  - Field-level: OAuth provider access/refresh tokens encrypted at rest via Better Auth's own `account.encryptOAuthTokens: true` (`src/auth/auth.ts`), keyed from `BETTER_AUTH_SECRET` rather than a separate `FIELD_ENCRYPTION_KEY` — that var is reserved for future sensitive fields this project encrypts itself in the repo layer.
   - Passwords are **hashed, not encrypted** (see below).
   - IP addresses in security logs are stored hashed (HMAC) and kept ≤ 90 days.
   - Data exports stored in a private bucket, deleted after 24 h.

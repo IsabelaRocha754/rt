@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { APP_NAME } from "@plate/shared";
 
-// The rest of TRD.md §10's list (Google, S3, Sentry...) stays optional until
-// the phase that introduces them — tighten to required there, never loosen
-// validation. Better Auth (BETTER_AUTH_*) and email (EMAIL_API_KEY) become
-// required as of Phase 1.
+// The rest of TRD.md §10's list (S3, Sentry...) stays optional until the
+// phase that introduces them — tighten to required there, never loosen
+// validation. Better Auth (BETTER_AUTH_*) and email (EMAIL_API_KEY) became
+// required as of Phase 1 PR1. Google/Apple OAuth (PR2) stay optional: each
+// provider is only enabled (src/auth/auth.ts) once its own vars are filled
+// in, so the API boots and email+password keeps working without them.
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -19,8 +21,39 @@ const envSchema = z
     // instead of sending mail when this is empty. Required in production.
     EMAIL_API_KEY: z.string().default(""),
     EMAIL_FROM: z.string().default(`${APP_NAME} <no-reply@plate.app>`),
+    GOOGLE_OAUTH_CLIENT_ID: z.string().default(""),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.string().default(""),
+    APPLE_CLIENT_ID: z.string().default(""),
+    APPLE_TEAM_ID: z.string().default(""),
+    APPLE_KEY_ID: z.string().default(""),
+    APPLE_PRIVATE_KEY: z.string().default(""),
   })
   .superRefine((value, ctx) => {
+    // Partial OAuth config is always a mistake, in every environment — a
+    // provider either has everything it needs or stays off.
+    const googleFields = [value.GOOGLE_OAUTH_CLIENT_ID, value.GOOGLE_OAUTH_CLIENT_SECRET];
+    if (googleFields.some(Boolean) && !googleFields.every(Boolean)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["GOOGLE_OAUTH_CLIENT_ID"],
+        message: "Set both GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET, or neither.",
+      });
+    }
+    const appleFields = [
+      value.APPLE_CLIENT_ID,
+      value.APPLE_TEAM_ID,
+      value.APPLE_KEY_ID,
+      value.APPLE_PRIVATE_KEY,
+    ];
+    if (appleFields.some(Boolean) && !appleFields.every(Boolean)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["APPLE_CLIENT_ID"],
+        message:
+          "Set APPLE_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY together, or none of them.",
+      });
+    }
+
     if (value.NODE_ENV !== "production") return;
 
     if (value.ADMIN_ORIGIN === "*") {
