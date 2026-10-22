@@ -12,7 +12,9 @@
     "test:security": "pnpm --filter @plate/api run test:security",
     "dev:api": "pnpm --filter @plate/api run dev",
     "dev:mobile": "pnpm --filter @plate/mobile run dev",
+    "dev:mobile:tunnel": "pnpm --filter @plate/mobile run dev:tunnel",
     "dev:admin": "pnpm --filter @plate/admin run dev",
+    "build:dev:android": "pnpm --filter @plate/mobile exec eas build --platform android --profile development",
     "db:migrate": "pnpm --filter @plate/api run db:migrate",
     "db:seed": "pnpm --filter @plate/api run db:seed",
     "prepare": "husky"
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "22.14.1",
+    "eas-cli": "25.2.0",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
     "husky": "9.1.7",

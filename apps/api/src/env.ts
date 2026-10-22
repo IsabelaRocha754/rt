@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { APP_NAME } from "@plate/shared";
 
-// Only vars Phase 0 actually uses are required. The rest of TRD.md §10's list
-// (Better Auth, Google, S3, email, Sentry...) stays optional until the phase
-// that introduces them — tighten to required there, never loosen validation.
+// The rest of TRD.md §10's list (Google, S3, Sentry...) stays optional until
+// the phase that introduces them — tighten to required there, never loosen
+// validation. Better Auth (BETTER_AUTH_*) and email (EMAIL_API_KEY) become
+// required as of Phase 1.
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -11,6 +13,12 @@ const envSchema = z
     DATABASE_URL: z.string().min(1),
     DATABASE_URL_OWNER: z.string().min(1),
     ADMIN_ORIGIN: z.string().min(1),
+    BETTER_AUTH_SECRET: z.string().min(32),
+    BETTER_AUTH_URL: z.string().min(1),
+    // Optional locally: sendVerificationEmail/sendResetPassword log to stdout
+    // instead of sending mail when this is empty. Required in production.
+    EMAIL_API_KEY: z.string().default(""),
+    EMAIL_FROM: z.string().default(`${APP_NAME} <no-reply@plate.app>`),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== "production") return;
@@ -44,6 +52,27 @@ const envSchema = z
         code: "custom",
         path: ["LOG_LEVEL"],
         message: "LOG_LEVEL must not be debug in production.",
+      });
+    }
+    if (!value.BETTER_AUTH_URL.startsWith("https://")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["BETTER_AUTH_URL"],
+        message: "BETTER_AUTH_URL must be an https URL in production.",
+      });
+    }
+    if (value.BETTER_AUTH_SECRET === "replace-with-32-byte-random-value") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["BETTER_AUTH_SECRET"],
+        message: "BETTER_AUTH_SECRET must not be the .env.example placeholder in production.",
+      });
+    }
+    if (value.EMAIL_API_KEY === "") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["EMAIL_API_KEY"],
+        message: "EMAIL_API_KEY is required in production (verification/reset email).",
       });
     }
   });

@@ -3,22 +3,29 @@ packages:
   - "packages/*"
 allowBuilds:
   "@parcel/watcher": true
+  dtrace-provider: true
   esbuild: true
+  protobufjs: true
   unrs-resolver: true
 # Force patched versions of vulnerable transitive deps (OSV-Scanner findings,
 # 2026-10-19) where a fix exists upstream.
 overrides:
   esbuild: 0.25.0
   uuid: 11.1.1
-  "@babel/core": 7.29.6
-# Tracked exceptions — no patched version exists upstream for either as of
-# 2026-10-19. Both are dev-tooling-only (Expo CLI / Metro bundler), never
-# shipped to end users. See docs/SECURITY.md §Checklist > Dependencies &
-# supply chain for the review date; remove once upstream ships a fix.
+  "@babel/core": 7.29.7
+  nanoid: 3.3.18
+  tar: 7.5.21
+  joi: 17.13.7
+# Tracked exceptions — see docs/SECURITY.md §Checklist > Dependencies &
+# supply chain for the review date; remove once upstream ships a fix (or,
+# for minimatch, once forcing the patch no longer breaks eas-cli).
 audit:
   ignore:
-    - GHSA-86w9-cpqp-85rv # node-forge, via @expo/cli
-    - GHSA-vfj7-8cjw-p6xm # braces, via metro-file-map/micromatch
+    - GHSA-86w9-cpqp-85rv # node-forge, via @expo/cli — no patched version upstream
+    - GHSA-vfj7-8cjw-p6xm # braces, via metro-file-map/micromatch — no patched version upstream
+    - GHSA-3ppc-4f35-3m26 # minimatch, eas-cli's own dependency@5.1.2
+    - GHSA-7r86-cg39-jmmj # minimatch, eas-cli's own dependency@5.1.2
+    - GHSA-23c5-xmqv-rm74 # minimatch, eas-cli's own dependency@5.1.2
 minimumReleaseAgeExclude:
   - "@expo/cli@58.1.13"
   - "@expo/metro-config@58.0.15"
@@ -31,3 +38,5 @@ minimumReleaseAgeExclude:
   - expo-modules-core@58.0.23
   - expo-modules-jsi@58.0.16
   - expo@58.0.16
+  - expo-localization@58.0.5
+  - expo-router@58.0.24

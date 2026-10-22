@@ -229,6 +229,7 @@ Additional rules:
 - Each request runs DB work inside a transaction that sets `SET LOCAL app.user_id = '<uuid>'` (and `app.role`).
 - `FORCE ROW LEVEL SECURITY` on all user-data tables; policies implement ownership for writes and `canView` (via a `SECURITY DEFINER` SQL function with a fixed `search_path`) for reads.
 - Background jobs that need broad access use a separate `app_worker` role with narrowly scoped policies.
+- **Exception: Better Auth's own tables** (`user`, `session`, `account`, `verification`, `rate_limit`) do **not** get RLS. Every access to them goes through Better Auth's own parameterized queries, running before any app session/`app.user_id` exists (sign-up, sign-in) — Better Auth itself is the trust boundary here, not a Postgres policy. All other tables with user data still get RLS as above.
 
 ## 6. Google Places integration
 

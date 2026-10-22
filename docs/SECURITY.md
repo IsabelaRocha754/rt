@@ -36,11 +36,11 @@ Each item says **how** it's done in this stack. During Phase 7, add evidence (te
   - Admin panel: cookies `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`, short idle timeout (30 min), absolute timeout (12 h), CSRF protection on state-changing requests, TOTP 2FA required for admin accounts.
   - Mobile: native apps don't use browser cookies; session tokens are stored in **expo-secure-store** (Keychain / Keystore) via Better Auth's Expo integration — never in AsyncStorage, logs, or URLs.
   - Sessions are revocable; password change/reset revokes all other sessions; "sign out of all devices" exists.
-- [ ] **Rate-limit login.** `@fastify/rate-limit` on auth routes: per IP and per account identifier (e.g. 5 attempts/min, then progressive backoff and temporary lock after 20/hour). Same for signup, password reset, and verification-email resend. Generic error messages to avoid account enumeration. Use a shared store (Redis/Upstash or Postgres) once more than one API instance runs.
+- [ ] **Rate-limit login.** Two layers, both keyed by IP: Better Auth's own limiter (`storage: "database"`, persists across restarts) gives sign-in/sign-up/password-reset/verification-resend a 5/min cap; `@fastify/rate-limit`, applied only to those same routes, adds a coarser 20/hour cap on top. Same for signup, password reset, and verification-email resend. Generic error messages to avoid account enumeration. Better Auth's `auth.handler` runs behind a plain `fetch` `Request` with no socket, so it can't see the caller's IP by itself — `src/plugins/auth.ts` sets a server-trusted `x-real-ip` header from Fastify's own `request.ip` on every forwarded request, and `src/auth/auth.ts` lists it in `advanced.ipAddress.ipAddressHeaders`; without this it silently falls back to one shared bucket for every client. Account-identifier-keyed limiting (not just IP) is not yet implemented — revisit once credential-stuffing patterns justify it.
 - [ ] **Add bot protection.**
   - Rate limits on signup, login, follow, like, comment, report, restaurant submission, autocomplete.
   - Email verification before posting; new accounts (< 24 h) get lower limits.
-  - Disposable-email domain blocklist at signup.
+  - Disposable-email domain blocklist at signup (`packages/shared/src/auth.ts`'s `DISPOSABLE_EMAIL_DOMAINS`, checked in `src/auth/auth.ts`'s `hooks.before`) — a curated list of ~30 common throwaway-mail providers, not exhaustive.
   - Device attestation before launch: Apple App Attest / Google Play Integrity token checked on signup and login (Phase 7). Cloudflare Turnstile on the admin login page.
   - Anomaly alerts: spikes in signups or 429s from one source.
 
@@ -65,12 +65,13 @@ Each item says **how** it's done in this stack. During Phase 7, add evidence (te
 ### Dependencies & supply chain
 
 - [ ] **Scan dependencies.** Dependabot (npm + GitHub Actions), `pnpm audit --audit-level=high` and OSV-Scanner in CI (fail on high/critical), CodeQL for JS/TS. Lockfile committed; exact versions pinned; new dependencies require approval (CLAUDE.md rule 9). GitHub Actions pinned to commit SHAs. Docker image based on a slim official Node LTS image, rebuilt weekly, runs as non-root.
-  - **Tracked exceptions**, dated 2026-10-19 — each has **no patched version** upstream as of this date and is dev-tooling-only, never shipped to end users. Re-check at the start of every phase; remove the exception once a fix ships.
-    - `GHSA-86w9-cpqp-85rv` (node-forge, via `@expo/cli`)
-    - `GHSA-vfj7-8cjw-p6xm` (braces, via Metro's `micromatch`)
-    - `GHSA-hp3w-g68c-fv3c` (sprintf-js, via Jest's istanbul coverage chain)
-    - `pnpm audit` reads these from `pnpm-workspace.yaml` → `audit.ignore`; OSV-Scanner (a separate tool, run in CI with `--config=./osv-scanner.toml`) reads the same three IDs from `osv-scanner.toml`'s `[[IgnoredVulns]]` — both files must be kept in sync.
-  - **Fixed via `pnpm-workspace.yaml` → `overrides`**: `esbuild` (0.25.0), `uuid` (11.1.1), `@babel/core` (7.29.6) — patched versions existed upstream, so these are forced across the whole dependency tree rather than exempted.
+  - **Tracked exceptions**, dated 2026-10-19 — no patched version upstream, or forcing the patch breaks a tool we rely on; dev-tooling-only in every case, never shipped to end users. Re-check at the start of every phase.
+    - `GHSA-86w9-cpqp-85rv` (node-forge, via `@expo/cli`) — no patched version upstream.
+    - `GHSA-vfj7-8cjw-p6xm` (braces, via Metro's `micromatch`) — no patched version upstream.
+    - `GHSA-hp3w-g68c-fv3c` (sprintf-js, via Jest's istanbul coverage chain) — no patched version upstream.
+    - `GHSA-3ppc-4f35-3m26`, `GHSA-7r86-cg39-jmmj`, `GHSA-23c5-xmqv-rm74` (minimatch, `eas-cli`'s own direct dependency, pinned at 5.1.2) — a patched version (5.1.8) exists, but forcing it via `overrides` breaks `eas` at runtime (`TypeError: minimatch_1.minimatch is not a function`) under this monorepo's `node-linker=hoisted` setting: hoisting forces every consumer in the tree onto one physical copy, and `eas-cli`'s compiled code expects the exact API shape of 5.1.2, not 5.1.8's. Re-test this exception whenever `eas-cli` is upgraded — a newer release may no longer hit this.
+    - `pnpm audit` reads these from `pnpm-workspace.yaml` → `audit.ignore`; OSV-Scanner (a separate tool, run in CI with `--config=./osv-scanner.toml`) reads the same six IDs from `osv-scanner.toml`'s `[[IgnoredVulns]]` — both files must be kept in sync.
+  - **Fixed via `pnpm-workspace.yaml` → `overrides`**: `esbuild` (0.25.0), `uuid` (11.1.1), `@babel/core` (7.29.7), `nanoid` (3.3.18), `tar` (7.5.21), `joi` (17.13.7) — patched versions existed upstream and forcing them doesn't break anything, so these are forced across the whole dependency tree rather than exempted.
 
 ### Logging & monitoring
 

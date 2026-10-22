@@ -22,6 +22,9 @@ export default fp(async function securityPlugin(app: FastifyInstance, opts: { en
   await app.register(rateLimit, {
     max: 100,
     timeWindow: "1 minute",
+    errorResponseBuilder: () => ({
+      error: { code: "rate_limited", message: "Too many requests." },
+    }),
   });
 
   await app.register(sensible);

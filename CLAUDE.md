@@ -23,7 +23,7 @@ Work in `DEV_PLAN.md` phase order. Don't start a phase until the previous phase'
 ## Stack (summary — details in TRD)
 
 - **Monorepo:** pnpm workspaces — `apps/mobile`, `apps/api`, `apps/admin`, `packages/shared`
-- **Mobile:** React Native + Expo (managed), TypeScript strict, Expo Router, TanStack Query, react-hook-form + Zod, i18next, expo-secure-store
+- **Mobile:** React Native + Expo (managed, SDK 58), TypeScript strict, Expo Router, TanStack Query, react-hook-form + Zod, i18next, expo-secure-store. Uses an **EAS development build** (`expo-dev-client`), not Expo Go — the public Expo Go app doesn't support SDK 58 yet. See "Running on a phone" below.
 - **API:** Node.js LTS + Fastify, TypeScript strict, Zod (via `fastify-type-provider-zod`), Drizzle ORM
 - **Auth:** Better Auth (email+password, Google, Apple) with its Expo integration
 - **DB:** PostgreSQL 16 with Row-Level Security as a second layer of access control
@@ -39,11 +39,13 @@ Development happens inside WSL (Ubuntu) on Windows.
 
 ```bash
 pnpm install                 # install all workspaces
-docker compose up -d         # local Postgres + MinIO
+docker compose up -d         # local Postgres + a local S3-compatible server (see docs/TRD.md §2a)
 pnpm db:migrate              # apply migrations (apps/api)
 pnpm db:seed                 # seed dev data (never runs in production)
 pnpm dev:api                 # API on http://localhost:3000
-pnpm dev:mobile              # Expo dev server
+pnpm dev:mobile              # Expo dev server for the dev client (local network)
+pnpm dev:mobile:tunnel       # same, over a tunnel (for a phone off the local network)
+pnpm build:dev:android       # EAS development build (Android dev-client APK)
 pnpm dev:admin               # admin panel
 pnpm lint && pnpm typecheck && pnpm test   # must pass before every commit
 pnpm test:security           # authz/IDOR + tampering test suite
@@ -52,6 +54,32 @@ pnpm test:security           # authz/IDOR + tampering test suite
 If a command above doesn't exist yet, create it as part of Phase 0.
 
 One-time local setup: install the [`gitleaks`](https://github.com/gitleaks/gitleaks) binary (not an npm package) so the pre-commit hook can run — e.g. download a release into `~/.local/bin` inside WSL. The hook refuses to commit if it's missing.
+
+### Running on a phone (Android)
+
+Expo Go doesn't support SDK 58, so the app runs through an EAS development build (`expo-dev-client`) instead. Full details and troubleshooting: `apps/mobile/README.md`.
+
+1. **One-time per account:** `pnpm exec eas login`, then `pnpm --filter @plate/mobile exec eas init` (already done for this project — see `apps/mobile/app.config.ts`'s `EAS_PROJECT_ID`).
+2. **Build the dev-client APK** (only needed once, or again if native code/config changes):
+   ```bash
+   pnpm build:dev:android
+   ```
+   When it finishes, open the printed build URL on the phone and install the APK (allow "install unknown apps" if prompted).
+3. **Every day after that**, just start Metro and reopen the already-installed app:
+   ```bash
+   pnpm dev:mobile:tunnel     # or pnpm dev:mobile if the phone is on the same network
+   ```
+   Open the dev-client app on the phone, scan the QR Metro prints (or paste the `exp+plate://…` URL manually if the terminal's QR doesn't scan).
+
+**WSL performance note:** if Metro hangs for minutes with no output after "Starting project at…", `node_modules` is probably sitting on the slow `/mnt/c` Windows-filesystem mount. Fix: move it onto WSL's native filesystem and symlink it back —
+
+```bash
+rsync -a /mnt/c/.../plate/node_modules/ ~/plate-node_modules/
+mv /mnt/c/.../plate/node_modules /mnt/c/.../plate/node_modules.bak   # keep as a fallback
+ln -s ~/plate-node_modules /mnt/c/.../plate/node_modules
+```
+
+Reads (Metro, `expo start`) work fine through the symlink. `pnpm install`/`pnpm add` do **not** — pnpm's hoisted linker needs `node_modules` to be a real directory to write into. So before changing dependencies: swap the real directory back (`rm node_modules && mv node_modules.bak node_modules`), run the install, then redo the `rsync`+symlink steps above (the rsync is incremental after the first run, so it's fast).
 
 ## Non-negotiable rules
 
