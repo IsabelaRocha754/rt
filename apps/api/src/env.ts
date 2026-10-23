@@ -27,6 +27,13 @@ const envSchema = z
     APPLE_TEAM_ID: z.string().default(""),
     APPLE_KEY_ID: z.string().default(""),
     APPLE_PRIVATE_KEY: z.string().default(""),
+    // Required as of Phase 1 PR4 (avatar upload pipeline).
+    S3_ENDPOINT: z.string().min(1),
+    S3_ACCESS_KEY_ID: z.string().min(1),
+    S3_SECRET_ACCESS_KEY: z.string().min(1),
+    S3_BUCKET_QUARANTINE: z.string().min(1),
+    S3_BUCKET_PUBLIC: z.string().min(1),
+    S3_BUCKET_PRIVATE: z.string().min(1),
   })
   .superRefine((value, ctx) => {
     // Partial OAuth config is always a mistake, in every environment — a
@@ -106,6 +113,13 @@ const envSchema = z
         code: "custom",
         path: ["EMAIL_API_KEY"],
         message: "EMAIL_API_KEY is required in production (verification/reset email).",
+      });
+    }
+    if (!value.S3_ENDPOINT.startsWith("https://")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["S3_ENDPOINT"],
+        message: "S3_ENDPOINT must be an https URL in production.",
       });
     }
   });

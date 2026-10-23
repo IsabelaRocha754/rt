@@ -1,5 +1,9 @@
+import { uuidv7 } from "uuidv7";
+import type { S3Client } from "@aws-sdk/client-s3";
 import type { AppUserDb } from "../../db/client.js";
 import { withUserTx } from "../../db/rls.js";
+import { deleteObject, getObjectBytes, putObjectBytes } from "../../storage/s3.js";
+import { detectImageType, InvalidImageError, processImage } from "../../photos/pipeline.js";
 import * as repo from "./repo.js";
 import type { ProfilePatch, ProfileRow } from "./repo.js";
 
@@ -55,4 +59,63 @@ export async function getPublicProfile(
     return { kind: "full", profile: target };
   }
   return { kind: "private", profile: target };
+}
+
+const AVATAR_SIZE_PX = 512;
+
+export class InvalidAvatarKeyError extends Error {}
+
+// The key embeds the owner's own user id so `completeAvatarUpload` can
+// check ownership without a DB round trip — there's no "pending avatar
+// upload" table (TRD §4's `profiles` only has the final `avatar_key`),
+// so this check is what stops user A from asking us to process (and claim
+// as their own) an object key some other flow issued for user B.
+export function avatarQuarantineKey(userId: string): string {
+  return `avatars/${userId}/${uuidv7()}`;
+}
+
+interface AvatarDeps {
+  db: AppUserDb;
+  s3: S3Client;
+  buckets: { quarantine: string; public: string };
+}
+
+// SECURITY.md "Restrict file uploads": magic-byte check, decode + re-encode
+// with sharp, strip all metadata, random public key, quarantine object
+// never served and always deleted (success or failure) — the pipeline
+// itself lives in src/photos/pipeline.ts and src/storage/s3.ts so Phase 3's
+// log photos can reuse it unchanged.
+export async function completeAvatarUpload(
+  deps: AvatarDeps,
+  userId: string,
+  quarantineKey: string,
+): Promise<ProfileRow> {
+  if (!quarantineKey.startsWith(`avatars/${userId}/`)) {
+    throw new InvalidAvatarKeyError();
+  }
+
+  const bytes = await getObjectBytes(deps.s3, deps.buckets.quarantine, quarantineKey);
+
+  try {
+    const detected = detectImageType(bytes);
+    if (!detected) throw new InvalidImageError("unrecognized image type");
+
+    const processed = await processImage(bytes, AVATAR_SIZE_PX);
+    const publicKey = `avatars/${uuidv7()}.webp`;
+    await putObjectBytes(
+      deps.s3,
+      deps.buckets.public,
+      publicKey,
+      processed.bytes,
+      processed.contentType,
+    );
+
+    return withUserTx(deps.db, userId, (tx) =>
+      repo.updateProfile(tx, userId, { avatarKey: publicKey }),
+    );
+  } finally {
+    // Quarantine objects are never served and never kept — this runs
+    // whether processing succeeded, failed, or threw.
+    await deleteObject(deps.s3, deps.buckets.quarantine, quarantineKey);
+  }
 }

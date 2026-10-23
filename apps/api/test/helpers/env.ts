@@ -26,6 +26,12 @@ export function buildTestEnv(overrides: Partial<Env> = {}): Env {
     APPLE_TEAM_ID: "",
     APPLE_KEY_ID: "",
     APPLE_PRIVATE_KEY: "",
+    S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://localhost:4566",
+    S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ?? "test",
+    S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "test",
+    S3_BUCKET_QUARANTINE: process.env.S3_BUCKET_QUARANTINE ?? "plate-quarantine",
+    S3_BUCKET_PUBLIC: process.env.S3_BUCKET_PUBLIC ?? "plate-public",
+    S3_BUCKET_PRIVATE: process.env.S3_BUCKET_PRIVATE ?? "plate-private",
     ...overrides,
   };
 }

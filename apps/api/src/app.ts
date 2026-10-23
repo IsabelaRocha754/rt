@@ -5,6 +5,7 @@ import { buildLoggerOptions } from "./plugins/logging.js";
 import securityPlugin from "./plugins/security.js";
 import errorHandlerPlugin from "./plugins/error-handler.js";
 import dbPlugin from "./plugins/db.js";
+import storagePlugin from "./plugins/storage.js";
 import authPlugin from "./plugins/auth.js";
 import healthRoutes from "./modules/health/routes.js";
 import profileRoutes from "./modules/profiles/routes.js";
@@ -18,6 +19,7 @@ export function buildApp(env: Env = loadEnv()) {
   app.register(securityPlugin, { env });
   app.register(errorHandlerPlugin, { env });
   app.register(dbPlugin, { env });
+  app.register(storagePlugin, { env });
   app.register(authPlugin, { env });
   app.register(profileRoutes);
   app.register(healthRoutes);

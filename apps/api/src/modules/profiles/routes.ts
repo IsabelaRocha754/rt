@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { InvalidImageError } from "../../photos/pipeline.js";
+import { createUploadUrl } from "../../storage/s3.js";
 import {
+  avatarCompleteBodySchema,
+  avatarUploadUrlBodySchema,
+  avatarUploadUrlResponseSchema,
   errorResponseSchema,
   meResponseSchema,
   patchMeBodySchema,
@@ -8,8 +13,11 @@ import {
   usernameParamSchema,
 } from "./schemas.js";
 import {
+  avatarQuarantineKey,
+  completeAvatarUpload,
   getOwnProfile,
   getPublicProfile,
+  InvalidAvatarKeyError,
   updateOwnProfile,
   UsernameTakenError,
 } from "./service.js";
@@ -102,6 +110,58 @@ export default async function profileRoutes(app: FastifyInstance) {
         isPrivate: view.profile.isPrivate,
         bio: view.profile.bio,
       };
+    },
+  });
+
+  typed.route({
+    method: "POST",
+    url: "/v1/me/avatar/upload-url",
+    preHandler: app.requireSession,
+    schema: { body: avatarUploadUrlBodySchema, response: { 200: avatarUploadUrlResponseSchema } },
+    handler: async (request) => {
+      const { user } = request.session!;
+      const { contentType, contentLength } = request.body;
+      const key = avatarQuarantineKey(user.id);
+      const url = await createUploadUrl(
+        app.s3,
+        app.buckets.quarantine,
+        key,
+        contentType,
+        contentLength,
+      );
+      return {
+        url,
+        key,
+        headers: { "Content-Type": contentType, "Content-Length": String(contentLength) },
+      };
+    },
+  });
+
+  typed.route({
+    method: "POST",
+    url: "/v1/me/avatar/complete",
+    preHandler: app.requireSession,
+    schema: {
+      body: avatarCompleteBodySchema,
+      response: { 200: meResponseSchema, 400: errorResponseSchema },
+    },
+    handler: async (request, reply) => {
+      const { user } = request.session!;
+      try {
+        const profile = await completeAvatarUpload(
+          { db: app.db, s3: app.s3, buckets: app.buckets },
+          user.id,
+          request.body.key,
+        );
+        return toMeResponse(user, profile);
+      } catch (error) {
+        if (error instanceof InvalidImageError || error instanceof InvalidAvatarKeyError) {
+          return reply.status(400).send({
+            error: { code: "invalid_image", message: "Could not process that image." },
+          });
+        }
+        throw error;
+      }
     },
   });
 }

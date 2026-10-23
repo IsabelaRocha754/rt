@@ -6,6 +6,7 @@ import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
 } from "@plate/shared";
+import { ALLOWED_UPLOAD_CONTENT_TYPES, MAX_UPLOAD_BYTES } from "../../storage/s3.js";
 
 const usernameSchema = z
   .string()
@@ -56,6 +57,23 @@ export const meResponseSchema = z.object({
 });
 
 export const usernameParamSchema = z.object({ username: z.string() });
+
+export const avatarUploadUrlBodySchema = z
+  .object({
+    contentType: z.enum(ALLOWED_UPLOAD_CONTENT_TYPES),
+    contentLength: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+  })
+  .strict();
+
+export const avatarUploadUrlResponseSchema = z.object({
+  url: z.string(),
+  key: z.string(),
+  // The client must send exactly these headers on its PUT — both are part
+  // of what the URL's signature covers, so anything else fails.
+  headers: z.object({ "Content-Type": z.string(), "Content-Length": z.string() }),
+});
+
+export const avatarCompleteBodySchema = z.object({ key: z.string() }).strict();
 
 // A private, non-self profile only ever gets this much (USER_FLOWS.md
 // F13): avatar, username, display name, and the "this account is private"

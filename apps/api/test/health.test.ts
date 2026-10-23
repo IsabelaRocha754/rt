@@ -1,29 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import type { Env } from "../src/env.js";
-
-const testEnv: Env = {
-  NODE_ENV: "test",
-  PORT: 3000,
-  LOG_LEVEL: "error",
-  DATABASE_URL: "postgres://app_user:changeme@localhost:5432/plate",
-  DATABASE_URL_OWNER: "postgres://app_owner:changeme@localhost:5432/plate",
-  ADMIN_ORIGIN: "http://localhost:5173",
-  BETTER_AUTH_SECRET: "test-secret-at-least-32-characters-long",
-  BETTER_AUTH_URL: "http://localhost:3000",
-  EMAIL_API_KEY: "",
-  EMAIL_FROM: "Plate <no-reply@plate.app>",
-  GOOGLE_OAUTH_CLIENT_ID: "",
-  GOOGLE_OAUTH_CLIENT_SECRET: "",
-  APPLE_CLIENT_ID: "",
-  APPLE_TEAM_ID: "",
-  APPLE_KEY_ID: "",
-  APPLE_PRIVATE_KEY: "",
-};
+import { buildTestEnv } from "./helpers/env.js";
 
 describe("GET /health", () => {
   it("returns 200 with the security headers present", async () => {
-    const app = buildApp(testEnv);
+    const app = buildApp(buildTestEnv());
     const response = await app.inject({ method: "GET", url: "/health" });
 
     expect(response.statusCode).toBe(200);

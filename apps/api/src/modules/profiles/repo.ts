@@ -4,7 +4,7 @@ import { profiles } from "../../db/schema/profiles.js";
 
 export type ProfileRow = typeof profiles.$inferSelect;
 export type ProfilePatch = Partial<
-  Pick<ProfileRow, "username" | "displayName" | "bio" | "isPrivate" | "locale">
+  Pick<ProfileRow, "username" | "displayName" | "bio" | "isPrivate" | "locale" | "avatarKey">
 >;
 
 // Every call here must run inside `withUserTx` (db/rls.ts) — RLS is the
