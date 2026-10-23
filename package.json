@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "22.14.1",
+    "@types/node": "26.6.5",
     "eas-cli": "25.2.0",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
