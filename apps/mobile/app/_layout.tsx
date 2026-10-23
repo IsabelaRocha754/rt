@@ -10,6 +10,8 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="log-sheet" options={{ presentation: "modal", headerShown: false }} />
       </Stack>

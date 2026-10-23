@@ -20,7 +20,18 @@ const config: ExpoConfig = {
   version: "0.0.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  plugins: ["expo-router", "expo-localization"],
+  plugins: [
+    "expo-router",
+    "expo-localization",
+    [
+      "expo-image-picker",
+      {
+        // Native permission-prompt text is baked in at build time, so it
+        // can't route through i18next (runtime) — kept in English for now.
+        photosPermission: "Plate uses your photos to let you add an avatar.",
+      },
+    ],
+  ],
   ios: {
     bundleIdentifier: BUNDLE_ID,
   },

@@ -52,11 +52,25 @@ export const meResponseSchema = z.object({
   role: z.enum(["user", "admin"]),
   plan: z.enum(["free", "premium"]),
   status: z.enum(["active", "suspended"]),
+  // null until `POST /me/accept-terms` (DEV_PLAN Phase 1 F1 "age & terms")
+  // — the client uses this to know whether that onboarding step is done.
+  ageConfirmedAt: z.coerce.string().nullable(),
+  termsAcceptedAt: z.coerce.string().nullable(),
+  termsVersion: z.string().nullable(),
   createdAt: z.coerce.string(),
   updatedAt: z.coerce.string(),
 });
 
 export const usernameParamSchema = z.object({ username: z.string() });
+
+// `ageConfirmed` must be the literal `true` — there is no "confirm you're
+// under 18" path (SECURITY.md §3 "Minimum age 18").
+export const acceptTermsBodySchema = z
+  .object({
+    ageConfirmed: z.literal(true),
+    termsVersion: z.string().min(1),
+  })
+  .strict();
 
 export const avatarUploadUrlBodySchema = z
   .object({

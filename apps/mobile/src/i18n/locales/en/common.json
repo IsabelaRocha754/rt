@@ -8,6 +8,93 @@
   "feed": { "placeholder": "Your feed will appear here." },
   "search": { "placeholder": "Search restaurants and people." },
   "activity": { "placeholder": "Notifications and requests will appear here." },
-  "profile": { "placeholder": "Your diary, lists and stats will appear here." },
-  "logSheet": { "placeholder": "Log a visit." }
+  "profile": {
+    "placeholder": "Your diary, lists and stats will appear here.",
+    "signOut": "Sign out",
+    "signOutAllDevices": "Sign out of all devices"
+  },
+  "logSheet": { "placeholder": "Log a visit." },
+  "auth": {
+    "welcome": {
+      "tagline": "Track every meal worth remembering.",
+      "createAccount": "Create account",
+      "signIn": "Sign in"
+    },
+    "method": {
+      "title": "Choose how to continue",
+      "apple": "Continue with Apple",
+      "google": "Continue with Google",
+      "email": "Continue with email",
+      "providerUnavailable": "That sign-in method isn't available yet. Try email instead."
+    },
+    "ageTerms": {
+      "title": "Before you continue",
+      "ageLabel": "I'm 18 or older",
+      "termsLabel": "I accept the Terms and Privacy Policy",
+      "continue": "Continue",
+      "required": "Both must be checked to continue."
+    },
+    "signupEmail": {
+      "title": "Create your account",
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "passwordHint": "At least 10 characters.",
+      "submit": "Create account",
+      "haveAccount": "Already have an account? Sign in"
+    },
+    "verifyEmail": {
+      "title": "Verify your email",
+      "body": "We sent a link to {{email}}. Open it, then come back here.",
+      "resend": "Resend email",
+      "resendCooldown": "Resend in {{seconds}}s",
+      "continue": "I've verified, continue",
+      "notYetVerified": "That email isn't verified yet. Check your inbox."
+    },
+    "signIn": {
+      "title": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "New here? Create an account",
+      "genericError": "Email or password incorrect."
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "email": "Email",
+      "submit": "Send reset link",
+      "sent": "If an account exists for that email, we sent a link to reset the password."
+    },
+    "errors": {
+      "disposableEmail": "Please use a permanent email address.",
+      "passwordCompromised": "This password has appeared in a data breach. Choose a different one.",
+      "rateLimited": "Too many attempts. Try again in a minute.",
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "onboarding": {
+    "username": {
+      "title": "Choose a username",
+      "username": "Username",
+      "usernameHint": "3-30 characters: a-z, 0-9, \"_\" and \".\"",
+      "displayName": "Display name",
+      "continue": "Continue",
+      "taken": "That username is already taken."
+    },
+    "avatarBio": {
+      "title": "Add a photo and bio",
+      "pickPhoto": "Choose photo",
+      "bio": "Bio",
+      "bioHint": "Up to 300 characters.",
+      "continue": "Continue",
+      "skip": "Skip for now"
+    },
+    "findFriends": {
+      "title": "Find friends",
+      "body": "Searching for friends is coming soon.",
+      "skip": "Skip for now",
+      "finish": "Done"
+    }
+  }
 }

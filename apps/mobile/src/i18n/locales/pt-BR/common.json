@@ -8,6 +8,93 @@
   "feed": { "placeholder": "Seu feed vai aparecer aqui." },
   "search": { "placeholder": "Busque restaurantes e pessoas." },
   "activity": { "placeholder": "Notificações e solicitações vão aparecer aqui." },
-  "profile": { "placeholder": "Seu diário, listas e estatísticas vão aparecer aqui." },
-  "logSheet": { "placeholder": "Registrar uma visita." }
+  "profile": {
+    "placeholder": "Seu diário, listas e estatísticas vão aparecer aqui.",
+    "signOut": "Sair",
+    "signOutAllDevices": "Sair de todos os dispositivos"
+  },
+  "logSheet": { "placeholder": "Registrar uma visita." },
+  "auth": {
+    "welcome": {
+      "tagline": "Guarde cada refeição que vale lembrar.",
+      "createAccount": "Criar conta",
+      "signIn": "Entrar"
+    },
+    "method": {
+      "title": "Escolha como continuar",
+      "apple": "Continuar com Apple",
+      "google": "Continuar com Google",
+      "email": "Continuar com email",
+      "providerUnavailable": "Esse método de login ainda não está disponível. Tente com email."
+    },
+    "ageTerms": {
+      "title": "Antes de continuar",
+      "ageLabel": "Tenho 18 anos ou mais",
+      "termsLabel": "Aceito os Termos e a Política de Privacidade",
+      "continue": "Continuar",
+      "required": "As duas opções precisam estar marcadas para continuar."
+    },
+    "signupEmail": {
+      "title": "Crie sua conta",
+      "name": "Nome",
+      "email": "Email",
+      "password": "Senha",
+      "passwordHint": "Pelo menos 10 caracteres.",
+      "submit": "Criar conta",
+      "haveAccount": "Já tem uma conta? Entrar"
+    },
+    "verifyEmail": {
+      "title": "Verifique seu email",
+      "body": "Enviamos um link para {{email}}. Abra-o e volte aqui.",
+      "resend": "Reenviar email",
+      "resendCooldown": "Reenviar em {{seconds}}s",
+      "continue": "Já verifiquei, continuar",
+      "notYetVerified": "Esse email ainda não foi verificado. Confira sua caixa de entrada."
+    },
+    "signIn": {
+      "title": "Entrar",
+      "email": "Email",
+      "password": "Senha",
+      "submit": "Entrar",
+      "forgotPassword": "Esqueceu a senha?",
+      "noAccount": "Não tem conta? Criar uma conta",
+      "genericError": "Email ou senha incorretos."
+    },
+    "forgotPassword": {
+      "title": "Redefinir sua senha",
+      "email": "Email",
+      "submit": "Enviar link de redefinição",
+      "sent": "Se existir uma conta com esse email, enviamos um link para redefinir a senha."
+    },
+    "errors": {
+      "disposableEmail": "Use um endereço de email permanente.",
+      "passwordCompromised": "Essa senha já apareceu em uma violação de dados. Escolha outra.",
+      "rateLimited": "Muitas tentativas. Tente novamente em um minuto.",
+      "generic": "Algo deu errado. Tente novamente."
+    }
+  },
+  "onboarding": {
+    "username": {
+      "title": "Escolha um nome de usuário",
+      "username": "Nome de usuário",
+      "usernameHint": "3 a 30 caracteres: a-z, 0-9, \"_\" e \".\"",
+      "displayName": "Nome de exibição",
+      "continue": "Continuar",
+      "taken": "Esse nome de usuário já está em uso."
+    },
+    "avatarBio": {
+      "title": "Adicione uma foto e uma bio",
+      "pickPhoto": "Escolher foto",
+      "bio": "Bio",
+      "bioHint": "Até 300 caracteres.",
+      "continue": "Continuar",
+      "skip": "Pular por agora"
+    },
+    "findFriends": {
+      "title": "Encontre amigos",
+      "body": "A busca de amigos chega em breve.",
+      "skip": "Pular por agora",
+      "finish": "Concluir"
+    }
+  }
 }

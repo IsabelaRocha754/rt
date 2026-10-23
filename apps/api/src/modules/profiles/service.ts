@@ -37,6 +37,25 @@ export async function updateOwnProfile(
   });
 }
 
+// DEV_PLAN Phase 1 F1 "18+ and terms acceptance stored with version" — a
+// dedicated action rather than a general PATCH /me field, since it only
+// ever moves forward (there's no "un-confirm you're 18") and is meant to
+// be called again on its own when `termsVersion` changes later.
+export function acceptTerms(
+  db: AppUserDb,
+  userId: string,
+  termsVersion: string,
+): Promise<ProfileRow> {
+  const now = new Date();
+  return withUserTx(db, userId, (tx) =>
+    repo.updateProfile(tx, userId, {
+      ageConfirmedAt: now,
+      termsAcceptedAt: now,
+      termsVersion,
+    }),
+  );
+}
+
 export type PublicProfileView =
   { kind: "full"; profile: ProfileRow } | { kind: "private"; profile: ProfileRow };
 

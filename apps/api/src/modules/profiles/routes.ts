@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { InvalidImageError } from "../../photos/pipeline.js";
 import { createUploadUrl } from "../../storage/s3.js";
 import {
+  acceptTermsBodySchema,
   avatarCompleteBodySchema,
   avatarUploadUrlBodySchema,
   avatarUploadUrlResponseSchema,
@@ -13,6 +14,7 @@ import {
   usernameParamSchema,
 } from "./schemas.js";
 import {
+  acceptTerms,
   avatarQuarantineKey,
   completeAvatarUpload,
   getOwnProfile,
@@ -40,6 +42,9 @@ function toMeResponse(
     role: profile.role,
     plan: profile.plan,
     status: profile.status,
+    ageConfirmedAt: profile.ageConfirmedAt?.toISOString() ?? null,
+    termsAcceptedAt: profile.termsAcceptedAt?.toISOString() ?? null,
+    termsVersion: profile.termsVersion,
     createdAt: profile.createdAt.toISOString(),
     updatedAt: profile.updatedAt.toISOString(),
   };
@@ -110,6 +115,18 @@ export default async function profileRoutes(app: FastifyInstance) {
         isPrivate: view.profile.isPrivate,
         bio: view.profile.bio,
       };
+    },
+  });
+
+  typed.route({
+    method: "POST",
+    url: "/v1/me/accept-terms",
+    preHandler: app.requireSession,
+    schema: { body: acceptTermsBodySchema, response: { 200: meResponseSchema } },
+    handler: async (request) => {
+      const { user } = request.session!;
+      const profile = await acceptTerms(app.db, user.id, request.body.termsVersion);
+      return toMeResponse(user, profile);
     },
   });
 

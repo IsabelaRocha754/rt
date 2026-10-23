@@ -1,11 +1,19 @@
-import { router, Tabs } from "expo-router";
+import { Redirect, router, Tabs } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../../src/theme/tokens";
+import { authClient } from "../../src/auth/client";
+import { useMe } from "../../src/api/useMe";
 
 export default function TabsLayout() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { data: me, isLoading: meLoading } = useMe();
+
+  if (sessionPending || meLoading) return null;
+  if (!session) return <Redirect href="/(auth)/welcome" />;
+  if (!me?.username) return <Redirect href="/(onboarding)/username" />;
 
   return (
     <Tabs

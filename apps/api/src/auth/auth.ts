@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware, APIError } from "better-auth/api";
 import { haveIBeenPwned } from "better-auth/plugins";
+import { expo } from "@better-auth/expo";
 import { DISPOSABLE_EMAIL_DOMAINS, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@plate/shared";
 import type { AppUserDb } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
@@ -64,7 +65,16 @@ export async function buildAuth(env: Env, db: AppUserDb) {
     // `/api/auth`. Every link Better Auth generates (verification, reset)
     // is built from this.
     baseURL: `${env.BETTER_AUTH_URL}/v1/auth`,
-    trustedOrigins: [env.ADMIN_ORIGIN],
+    // "plate://" is the mobile app's own deep-link scheme (apps/mobile/
+    // app.config.ts) — the Expo plugin below needs it listed here to
+    // accept redirects back into the app (email verification, OAuth). The
+    // "exp://" patterns are Expo Go/dev-client's own dev-server scheme and
+    // must never ship to production.
+    trustedOrigins: [
+      env.ADMIN_ORIGIN,
+      "plate://",
+      ...(env.NODE_ENV !== "production" ? ["exp://", "exp://**", "exp://192.168.*.*:*/**"] : []),
+    ],
     // UUIDv7 ids everywhere (CLAUDE.md "Conventions") — let the `idColumn()`
     // defaults in db/schema/auth.ts generate them, instead of Better Auth's
     // own id generator.
@@ -97,6 +107,9 @@ export async function buildAuth(env: Env, db: AppUserDb) {
       sendVerificationEmail: async ({ user, url }) => {
         await sendVerificationEmail(env, user.email, url);
       },
+      // USER_FLOWS.md F1: verifying lands the user straight into username
+      // selection, not back at the sign-in screen.
+      autoSignInAfterVerification: true,
     },
     rateLimit: {
       enabled: true,
@@ -114,6 +127,7 @@ export async function buildAuth(env: Env, db: AppUserDb) {
       },
     },
     plugins: [
+      expo(),
       haveIBeenPwned({
         customPasswordCompromisedMessage:
           "This password has appeared in a data breach. Please choose a different one.",
